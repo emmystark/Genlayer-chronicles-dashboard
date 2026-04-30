@@ -1,0 +1,104 @@
+/* 1. Google Fonts - Must be at the absolute top */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+/* 2. Import Tailwind CSS v4 */
+@import "tailwindcss";
+
+/* 3. Theme Configuration */
+@theme {
+  /* Custom Font Families */
+  --font-space-grotesk: "Space Grotesk", sans-serif;
+  --font-dm-sans: "DM Sans", sans-serif;
+
+  /* Optional: Make DM Sans the default font */
+  --default-font-family: var(--font-dm-sans);
+
+  /* Brand Colors */
+  --color-brand-purple: #7C3AED;
+  --color-brand-cyan: #06B6D4;
+  
+  /* You can add more custom colors here */
+  /* --color-dark-bg: #0A0A0F; */
+}
+
+/* 4. Base Styles */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    background: #0A0A0F;
+    color: #E2E8F0;
+    font-family: var(--font-dm-sans);
+    height: 100%;
+    line-height: 1.6;
+  }
+}
+
+/* 5. Components Layer */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .card-hover {
+    transition: all 0.25s ease;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+    border-color: rgba(124, 58, 237, 0.35) !important;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #06B6D4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .sidebar-link {
+    transition: all 0.2s ease;
+  }
+  
+  .sidebar-link:hover {
+    background: rgba(124, 58, 237, 0.12);
+    color: #fff;
+  }
+  
+  .sidebar-link.active {
+    background: rgba(124, 58, 237, 0.2);
+    color: #fff;
+    border-right: 2px solid #7C3AED;
+  }
+}
+
+/* 6. Custom Utilities & Overrides */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.3);
+  border-radius: 2px;
+}
+
+/* Custom Tags */
+.tag-story { background: rgba(124, 58, 237, 0.25); color: #a78bfa; }
+.tag-moment { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+.tag-lesson { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.tag-milestone { background: rgba(234, 179, 8, 0.2); color: #fbbf24; }
