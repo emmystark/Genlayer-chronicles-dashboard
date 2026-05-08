@@ -1,36 +1,50 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Moon, Bell, PenSquare, ChevronDown, SlidersHorizontal } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import StoryCard from "@/components/StoryCard";
-
-const ALL_STORIES = [
-  { id: "1", tag: "Story" as const, title: "The Night That Changed Everything", excerpt: "Sometimes, one moment can change the way you see the world forever.", author: "Alex R.", likes: 128, comments: 24, image: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop" },
-  { id: "2", tag: "Moment" as const, title: "Our First Concert", excerpt: "The energy, the music, the people. Unforgettable.", author: "Maya L.", likes: 98, comments: 16, image: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=600&h=400&fit=crop" },
-  { id: "3", tag: "Lesson" as const, title: "Notes from the Past", excerpt: "Old notes, big dreams, and everything in between.", author: "Jordan K.", likes: 76, comments: 12, image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=600&h=400&fit=crop" },
-  { id: "4", tag: "Milestone" as const, title: "Lost in Nature, Found Myself", excerpt: "Sometimes you need to get lost to find yourself.", author: "Chris T.", likes: 112, comments: 18, image: "https://images.unsplash.com/photo-1501854140801-50d01698950b?w=600&h=400&fit=crop" },
-  { id: "5", tag: "Lesson" as const, title: "Discipline Over Motivation", excerpt: "Motivation fades, but discipline builds the life you want.", author: "Sam W.", likes: 204, comments: 31, image: "https://images.unsplash.com/photo-1483058712412-4245e9b90334?w=600&h=400&fit=crop" },
-  { id: "6", tag: "Milestone" as const, title: "Reached the Top", excerpt: "It wasn't just about the view. It was about proving to myself I could do it.", author: "Jamie P.", likes: 189, comments: 27, image: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&h=400&fit=crop" },
-  { id: "7", tag: "Moment" as const, title: "Captured a Memory", excerpt: "Behind every photo is a story you'll never forget.", author: "Taylor M.", likes: 93, comments: 9, image: "https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?w=600&h=400&fit=crop" },
-  { id: "8", tag: "Story" as const, title: "A New Beginning", excerpt: "Every ending is a new beginning in disguise.", author: "Riley S.", likes: 147, comments: 22, image: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=600&h=400&fit=crop" },
-];
+import { fetchStories, type Story } from "@/lib/api";
 
 const TABS = ["All", "Stories", "Moments", "Milestones", "Lessons"] as const;
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<typeof TABS[number]>("All");
-  const [search, setSearch] = useState("");
+// Map tab label → API tag value
+const TAB_TO_TAG: Record<string, string | null> = {
+  All: null,
+  Stories: "Story",
+  Moments: "Moment",
+  Milestones: "Milestone",
+  Lessons: "Lesson",
+};
 
-  const filtered = ALL_STORIES.filter((s) => {
-    const matchTab =
-      activeTab === "All" ||
-      (activeTab === "Stories" && s.tag === "Story") ||
-      (activeTab === "Moments" && s.tag === "Moment") ||
-      (activeTab === "Milestones" && s.tag === "Milestone") ||
-      (activeTab === "Lessons" && s.tag === "Lesson");
-    const matchSearch = s.title.toLowerCase().includes(search.toLowerCase()) || s.excerpt.toLowerCase().includes(search.toLowerCase());
-    return matchTab && matchSearch;
-  });
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>("All");
+  const [search, setSearch] = useState("");
+  const [stories, setStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadStories = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tag = TAB_TO_TAG[activeTab];
+      const data = await fetchStories(tag, search || undefined);
+      setStories(data);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to load stories. Make sure the backend is running.");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, search]);
+
+  // Debounce search so we don't fire on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadStories();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [loadStories]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A0A0F]">
@@ -48,7 +62,9 @@ export default function Dashboard() {
               placeholder="Search stories..."
               className="w-full bg-white/5 border border-white/8 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 font-body focus:outline-none focus:border-purple-500/50 transition-colors"
             />
-            <kbd className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1 text-[10px] text-slate-600 bg-white/5 rounded px-1.5 py-0.5">⌘K</kbd>
+            <kbd className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1 text-[10px] text-slate-600 bg-white/5 rounded px-1.5 py-0.5">
+              ⌘K
+            </kbd>
           </div>
           <div className="flex items-center gap-2 ml-auto">
             <button className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
@@ -58,7 +74,10 @@ export default function Dashboard() {
               <Bell size={15} />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-purple-500 rounded-full" />
             </button>
-            <a href="/post-memory" className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-display font-medium px-4 py-2 rounded-xl transition-colors">
+            <a
+              href="/post-memory"
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-display font-medium px-4 py-2 rounded-xl transition-colors"
+            >
               <PenSquare size={14} />
               <span className="hidden sm:inline">Post Memory</span>
             </a>
@@ -81,9 +100,7 @@ export default function Dashboard() {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-display font-medium transition-all ${
-                    activeTab === tab
-                      ? "bg-purple-600 text-white"
-                      : "text-slate-400 hover:text-white"
+                    activeTab === tab ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
                   }`}
                 >
                   {tab}
@@ -101,17 +118,25 @@ export default function Dashboard() {
           </div>
 
           {/* Grid */}
-          {filtered.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 text-slate-500">
+              <p className="font-display text-sm text-red-400">{error}</p>
+            </div>
+          ) : stories.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filtered.map((s) => (
-                <StoryCard key={s.id} story={s as any} />
+              {stories.map((s) => (
+                <StoryCard key={s.id} story={s} />
               ))}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20 text-slate-500">
               <Search size={32} className="mb-3 opacity-40" />
               <p className="font-display text-sm">No stories found</p>
-              <p className="font-body text-xs mt-1">Try a different search or category</p>
+              <p className="font-body text-xs mt-1">Be the first to share a memory!</p>
             </div>
           )}
         </div>

@@ -1,232 +1,195 @@
 import express, { Express, Request, Response } from 'express';
-import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import mongoose, { Schema, model } from 'mongoose';
 
 dotenv.config();
 
 const app: Express = express();
 
-// Types
-interface Story {
-  id: string;
-  tag: 'Story' | 'Moment' | 'Milestone' | 'Lesson';
-  title: string;
-  excerpt: string;
-  author: string;
-  likes: number;
-  comments: number;
-  image: string;
-  content: string;
-  tags: string[];
-  createdAt: Date;
-}
+// CORS — must be first middleware
+app.use((req: any, res: any, next: any) => {
+  const allowed = [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+  const origin = req.headers.origin;
+  if (!origin || allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+  next();
+});
 
-interface Comment {
-  id: string;
-  storyId: string;
-  author: string;
-  content: string;
-  createdAt: Date;
-}
-
-interface User {
-  id: string;
-  username: string;
-  name: string;
-  bio: string;
-  avatar: string;
-}
-
-interface Database {
-  stories: Story[];
-  comments: Comment[];
-  users: User[];
-}
-
-// Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Storage setup
+// MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chronicles';
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB error:', err));
+
+// Schemas
+const storySchema = new Schema({
+  tag: { type: String, enum: ['Story', 'Moment', 'Milestone', 'Lesson'], default: 'Story' },
+  title: { type: String, required: true },
+  excerpt: String,
+  author: { type: String, required: true },
+  likes: { type: Number, default: 0 },
+  comments: { type: Number, default: 0 },
+  image: String,
+  content: { type: String, required: true },
+  tags: [String],
+  createdAt: { type: Date, default: Date.now }
+});
+
+const commentSchema = new Schema({
+  storyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Story' },
+  author: String,
+  content: String,
+  createdAt: { type: Date, default: Date.now }
+});
+
+const StoryModel = model('Story', storySchema);
+const CommentModel = model('Comment', commentSchema);
+
+// File uploads
 const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  })
+});
+
+app.use('/uploads', express.static(uploadsDir));
+
+function norm(doc: any) {
+  const o = doc.toObject ? doc.toObject() : { ...doc };
+  o.id = o._id.toString();
+  return o;
 }
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
-});
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
+app.get('/health', (_req, res) => res.json({ ok: true, port: process.env.PORT || 3001 }));
 
-// Database
-const db: Database = {
-  stories: [
-    {
-      id: '1',
-      tag: 'Story',
-      title: 'The Night That Changed Everything',
-      excerpt: 'Sometimes, one moment can change the way you see the world forever.',
-      author: 'Alex R.',
-      likes: 128,
-      comments: 24,
-      image: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop',
-      content: 'Full story content about a transformative night...',
-      tags: [],
-      createdAt: new Date(Date.now() - 86400000)
-    }
-  ],
-  comments: [],
-  users: [
-    {
-      id: '1',
-      username: 'alex-r',
-      name: 'Alex R.',
-      bio: 'Storyteller',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex'
-    }
-  ]
-};
-
-// Routes
-app.get('/api/stories', (req: Request, res: Response) => {
-  const { tag, search } = req.query;
-  let filtered = db.stories;
-
-  if (tag && tag !== 'All') {
-    filtered = filtered.filter(s => s.tag === tag);
+app.get('/api/stories', async (req: Request, res: Response) => {
+  try {
+    const { tag, search } = req.query;
+    const query: any = {};
+    if (tag && tag !== 'All') query.tag = tag;
+    if (search) query.$or = [
+      { title: { $regex: search, $options: 'i' } },
+      { excerpt: { $regex: search, $options: 'i' } }
+    ];
+    const stories = await StoryModel.find(query).sort({ createdAt: -1 });
+    res.json(stories.map(norm));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch stories' });
   }
-  if (search) {
-    const searchStr = (search as string).toLowerCase();
-    filtered = filtered.filter(s =>
-      s.title.toLowerCase().includes(searchStr) ||
-      s.excerpt.toLowerCase().includes(searchStr)
+});
+
+app.get('/api/stories/:id', async (req: Request, res: Response) => {
+  try {
+    const story = await StoryModel.findById(req.params.id);
+    if (!story) { res.status(404).json({ error: 'Not found' }); return; }
+    const comments = await CommentModel.find({ storyId: req.params.id }).sort({ createdAt: -1 });
+    const obj = norm(story);
+    obj.comment = comments.map(norm);
+    res.json(obj);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch story' });
+  }
+});
+
+app.post('/api/stories', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const { title, excerpt, content, author, tag, tags } = req.body;
+    if (!title || !content || !author) {
+      res.status(400).json({ error: 'title, content and author are required' });
+      return;
+    }
+    const safeTags = typeof tags === 'string'
+      ? tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+      : [];
+    const story = await new StoryModel({
+      tag: tag || 'Story', title, author, content,
+      excerpt: excerpt || content.substring(0, 100),
+      image: req.file ? `/uploads/${req.file.filename}` : undefined,
+      tags: safeTags
+    }).save();
+    console.log('✅ Story saved:', story._id);
+    res.status(201).json(norm(story));
+  } catch (err) {
+    console.error('❌ Save error:', err);
+    res.status(500).json({ error: 'Failed to save story' });
+  }
+});
+
+app.post('/api/stories/:id/like', async (req: Request, res: Response) => {
+  try {
+    const story = await StoryModel.findByIdAndUpdate(
+      req.params.id, { $inc: { likes: 1 } }, { new: true }
     );
+    if (!story) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(norm(story));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to like story' });
   }
-
-  const sorted = filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  res.json(sorted);
 });
 
-app.get('/api/stories/:id', (req: Request, res: Response) => {
-  const story = db.stories.find(s => s.id === req.params.id);
-  if (!story) return res.status(404).json({ error: 'Story not found' });
-
-  const comments = db.comments.filter(c => c.storyId === story.id);
-  res.json({ ...story, comments });
+app.get('/api/stories/:id/comments', async (req: Request, res: Response) => {
+  try {
+    const comments = await CommentModel.find({ storyId: req.params.id }).sort({ createdAt: -1 });
+    res.json(comments.map(norm));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
 });
 
-app.post('/api/stories', upload.single('image'), (req: Request, res: Response) => {
-  const { title, excerpt, content, author, tag, tags } = req.body;
-  if (!title || !author) return res.status(400).json({ error: 'Missing required fields' });
-
-  const story: Story = {
-    id: String(Date.now()),
-    tag: tag || 'Story',
-    title,
-    excerpt: excerpt || content.substring(0, 100),
-    author,
-    likes: 0,
-    comments: 0,
-    image: req.file
-      ? `/uploads/${req.file.filename}`
-      : 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop',
-    content,
-    tags: tags ? tags.split(',').map((t: string) => t.trim()) : [],
-    createdAt: new Date()
-  };
-
-  db.stories.push(story);
-  res.status(201).json(story);
+app.post('/api/stories/:id/comments', async (req: Request, res: Response) => {
+  try {
+    const { author, content } = req.body;
+    if (!author || !content) {
+      res.status(400).json({ error: 'author and content required' });
+      return;
+    }
+    const comment = await new CommentModel({ storyId: req.params.id, author, content }).save();
+    await StoryModel.findByIdAndUpdate(req.params.id, { $inc: { comments: 1 } });
+    res.status(201).json(norm(comment));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
 });
 
-app.put('/api/stories/:id', (req: Request, res: Response) => {
-  const story = db.stories.find(s => s.id === req.params.id);
-  if (!story) return res.status(404).json({ error: 'Story not found' });
-
-  Object.assign(story, req.body);
-  res.json(story);
+app.get('/api/stats', async (_req: Request, res: Response) => {
+  try {
+    const totalStories = await StoryModel.countDocuments();
+    const agg = await StoryModel.aggregate([{ $group: { _id: null, totalLikes: { $sum: '$likes' } } }]);
+    res.json({
+      totalStories,
+      totalCommunityMembers: 1,
+      totalLikes: agg[0]?.totalLikes || 0,
+      totalComments: await CommentModel.countDocuments()
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
 });
 
-app.delete('/api/stories/:id', (req: Request, res: Response) => {
-  const idx = db.stories.findIndex(s => s.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Story not found' });
-
-  db.stories.splice(idx, 1);
-  db.comments = db.comments.filter(c => c.storyId !== req.params.id);
-  res.json({ message: 'Story deleted' });
-});
-
-app.post('/api/stories/:id/like', (req: Request, res: Response) => {
-  const story = db.stories.find(s => s.id === req.params.id);
-  if (!story) return res.status(404).json({ error: 'Story not found' });
-  story.likes = (story.likes || 0) + 1;
-  res.json(story);
-});
-
-app.post('/api/stories/:id/comments', (req: Request, res: Response) => {
-  const { author, content } = req.body;
-  if (!author || !content) return res.status(400).json({ error: 'Missing required fields' });
-
-  const comment: Comment = {
-    id: String(Date.now()),
-    storyId: req.params.id,
-    author,
-    content,
-    createdAt: new Date()
-  };
-
-  db.comments.push(comment);
-  const story = db.stories.find(s => s.id === req.params.id);
-  if (story) story.comments = (story.comments || 0) + 1;
-
-  res.status(201).json(comment);
-});
-
-app.get('/api/stories/:id/comments', (req: Request, res: Response) => {
-  const comments = db.comments.filter(c => c.storyId === req.params.id);
-  res.json(comments);
-});
-
-app.get('/api/users/:username', (req: Request, res: Response) => {
-  const user = db.users.find(u => u.username === req.params.username);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  const stories = db.stories.filter(s => s.author === user.name);
-  res.json({ ...user, stories });
-});
-
-app.post('/api/users', (req: Request, res: Response) => {
-  const { username, name, bio } = req.body;
-  if (!username || !name) return res.status(400).json({ error: 'Missing required fields' });
-
-  const user: User = {
-    id: String(Date.now()),
-    username,
-    name,
-    bio: bio || '',
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
-  };
-
-  db.users.push(user);
-  res.status(201).json(user);
-});
-
-app.get('/api/stats', (req: Request, res: Response) => {
-  res.json({
-    totalStories: db.stories.length,
-    totalCommunityMembers: db.users.length,
-    totalLikes: db.stories.reduce((sum, s) => sum + (s.likes || 0), 0),
-    totalComments: db.comments.length
-  });
-});
-
-app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
-
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  console.log(`   Health check: http://localhost:${PORT}/health`);
 });
