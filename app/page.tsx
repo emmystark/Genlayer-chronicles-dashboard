@@ -62,21 +62,21 @@ export default function Dashboard() {
               placeholder="Search stories..."
               className="w-full bg-white/5 border border-white/8 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 font-body focus:outline-none focus:border-purple-500/50 transition-colors"
             />
-            <kbd className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1 text-[10px] text-slate-600 bg-white/5 rounded px-1.5 py-0.5">
+            {/* <kbd className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1 text-[10px] text-slate-600 bg-white/5 rounded px-1.5 py-0.5">
               ⌘K
-            </kbd>
+            </kbd> */}
           </div>
           <div className="flex items-center gap-2 ml-auto">
-            <button className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+            {/* <button className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
               <Moon size={15} />
             </button>
             <button className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-white transition-colors relative">
               <Bell size={15} />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-purple-500 rounded-full" />
-            </button>
+            </button> */}
             <a
               href="/post-memory"
-              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-display font-medium px-4 py-2 rounded-xl transition-colors"
+              className="flex items-center gap-2 bg-gray-400 hover:bg-gray-500 text-white text-sm font-display font-medium px-4 py-2 rounded-xl transition-colors"
             >
               <PenSquare size={14} />
               <span className="hidden sm:inline">Post Memory</span>
@@ -100,21 +100,21 @@ export default function Dashboard() {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-display font-medium transition-all ${
-                    activeTab === tab ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
+                    activeTab === tab ? "bg-gray-400 text-white" : "text-slate-400 hover:text-white"
                   }`}
                 >
                   {tab}
                 </button>
               ))}
             </div>
-            <div className="ml-auto flex items-center gap-2">
+            {/* <div className="ml-auto flex items-center gap-2">
               <button className="flex items-center gap-1.5 bg-white/5 border border-white/8 rounded-xl px-3 py-2 text-sm text-slate-400 hover:text-white font-body transition-colors">
                 Latest <ChevronDown size={13} />
               </button>
               <button className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
                 <SlidersHorizontal size={14} />
               </button>
-            </div>
+            </div> */}
           </div>
 
           {/* Grid */}

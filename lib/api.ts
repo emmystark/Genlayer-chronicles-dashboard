@@ -33,6 +33,7 @@ export interface Stats {
   totalComments: number;
 }
 
+
 function norm(obj: any): any {
   if (!obj) return obj;
   if (obj._id && !obj.id) obj.id = obj._id.toString();
@@ -78,7 +79,7 @@ export async function createStory(data: {
   fd.append('tag', data.tag);
   fd.append('tags', data.tags);
   if (data.image) fd.append('image', data.image);
-  // No Content-Type header — browser sets multipart boundary automatically
+
   const res = await fetch(`${B}/api/stories`, { method: 'POST', body: fd });
   if (!res.ok) {
     const e = await res.json().catch(() => ({ error: 'Server error' }));

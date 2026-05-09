@@ -27,7 +27,7 @@ export default function StoryCard({ story }: StoryCardProps) {
           </div>
           <div className="p-4 flex flex-col flex-1">
             <div className="flex items-center gap-2 mb-3">
-              <span className="px-2 py-1 rounded text-xs font-semibold bg-gradient-to-r from-purple-600 to-cyan-600 text-white">
+              <span className="px-2 py-1 rounded text-xs font-semibold bg-gradient-to-r bg-gray-400 text-white">
                 {story.tag}
               </span>
             </div>

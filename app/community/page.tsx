@@ -15,12 +15,12 @@ function StatCard({ icon, label, value }: StatCardProps) {
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-lg bg-gradient-to-br bg-gray-400 flex items-center justify-center">
           {icon}
         </div>
         <div>
           <p className="text-slate-400 text-sm">{label}</p>
-          <p className="text-3xl font-bold text-white">{value?.toLocaleString() || '—'}</p>
+          <p className="text-3xl font-bold text-white">{value?.toLocaleString() || ''}</p>
         </div>
       </div>
     </div>
@@ -48,7 +48,7 @@ export default function Community() {
         
         <Sidebar/>
       {/* Header */}
-      <div className="max-w-6xl mx-10 mt-20 xl:mx-auto">
+      <div className="max-w-6xl mx-10 xl:overflow-x-hidden pb-20 mt-20 xl:mx-auto">
 
       <div className=''>
         <div className="mb-8">
@@ -73,7 +73,7 @@ export default function Community() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8">
           <h2 className="text-2xl font-bold text-white mb-4">About GenLayer Chronicles</h2>
           <p className="text-slate-300 leading-relaxed mb-4">
-            GenLayer Chronicles is a dedicated digital platform for the GenLayer community. It's a space where members share personal stories, moments, and milestones that highlight how GenLayer has impacted their lives—through learning, creativity, and community connection.
+            GenLayer Chronicles is a dedicated digital platform for the GenLayer community. It's a space where members share personal stories, moments, and milestones that highlight how GenLayer has impacted their livesthrough learning, creativity, and community connection.
           </p>
           <p className="text-slate-300 leading-relaxed mb-4">
             This platform celebrates the real experiences and authentic voices of our community. Whether you're sharing a breakthrough moment, a lesson learned, or a milestone achieved, your story matters and contributes to our collective archive of gratitude, growth, and connection.
@@ -88,7 +88,7 @@ export default function Community() {
         <p className="text-slate-400 mb-6">Join thousands of community members sharing their most meaningful moments.</p>
         <a
           href="/post-memory"
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r bg-gray-400 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all"
         >
           Share Your Memory
         </a>

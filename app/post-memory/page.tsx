@@ -6,10 +6,10 @@ import { createStory } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 
 const CATEGORIES = [
-  { value: 'Story', label: 'Story', icon: '📖' },
-  { value: 'Moment', label: 'Moment', icon: '⏱️' },
-  { value: 'Milestone', label: 'Milestone', icon: '🎯' },
-  { value: 'Lesson', label: 'Lesson', icon: '💡' }
+  { value: 'Story', label: 'Story', icon: '' },
+  { value: 'Moment', label: 'Moment', icon: '' },
+  { value: 'Milestone', label: 'Milestone', icon: '' },
+  { value: 'Lesson', label: 'Lesson', icon: '' }
 ] as const;
 
 export default function PostMemory() {
@@ -28,7 +28,7 @@ export default function PostMemory() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImage(file); // pass the File object directly — createStory handles FormData
+      setImage(file); // pass the File object directly  createStory handles FormData
       const reader = new FileReader();
       reader.onload = (event) => setImagePreview(event.target?.result as string);
       reader.readAsDataURL(file);
@@ -53,7 +53,7 @@ export default function PostMemory() {
         author,
         content,
         tags,
-        image: image ?? undefined, // File object — NOT base64
+        image: image ?? undefined, // File object  NOT base64
       });
       router.push('/');
     } catch (err) {
@@ -92,7 +92,7 @@ export default function PostMemory() {
                       onClick={() => setCategory(value)}
                       className={`p-4 rounded-lg border transition-all text-center ${
                         category === value
-                          ? 'bg-gradient-to-r from-purple-600 to-cyan-600 border-slate-700 text-white'
+                          ? 'bg-gradient-to-r bg-gray-400 border-slate-700 text-white'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
                       }`}
                     >
@@ -152,7 +152,7 @@ export default function PostMemory() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
-                  className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-purple-600 file:to-cyan-600 file:text-white hover:file:opacity-80"
+                  className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:bg-gray-500 file:bg-gray-600 file:text-white hover:file:opacity-80"
                 />
               </div>
 
@@ -173,7 +173,7 @@ export default function PostMemory() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-3 bg-gradient-to-r bg-gray-400 text-white font-semibold rounded-lg hover:from-gray-500 hover:to-gray-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Publishing...' : 'Publish Memory'}
               </button>
@@ -187,14 +187,14 @@ export default function PostMemory() {
                 </div>
                 <div className="p-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="px-2 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-600 to-cyan-600 text-white">
+                    <span className="px-2 py-1 rounded-md text-xs font-semibold bg-gradient-to-r bg-gray-400 text-white">
                       {category}
                     </span>
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2 line-clamp-2">{title || 'Your title here'}</h3>
                   <p className="text-sm text-slate-400 mb-4">{excerpt || 'Your excerpt will appear here'}</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-cyan-600" />
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br bg-gray-400" />
                     <div>
                       <p className="text-sm font-medium text-white">{author || 'Your name'}</p>
                       <p className="text-xs text-slate-400">Just now</p>
@@ -204,7 +204,7 @@ export default function PostMemory() {
               </div>
 
               <div className="mt-6 bg-slate-900 border border-slate-800 rounded-lg p-4">
-                <p className="text-xs font-semibold text-white mb-3">💡 Tips for a great memory</p>
+                <p className="text-xs font-semibold text-white mb-3"> Tips for a great memory</p>
                 <ul className="space-y-2 text-xs text-slate-400">
                   <li>• Be authentic and write from the heart</li>
                   <li>• Add specific details that bring your story to life</li>

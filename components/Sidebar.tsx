@@ -39,9 +39,7 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <Link href="/" className="px-6 mb-12 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center text-white font-bold text-sm">
-            G
-          </div>
+          <img src="/logo.png" height={30} width={30} alt="" />
           <div className="flex flex-col">
             <span className="text-sm font-bold text-white">GenLayer</span>
             <span className="text-[10px] text-slate-400">Chronicles</span>
@@ -59,7 +57,7 @@ export default function Sidebar() {
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-purple-600 to-cyan-600 text-white'
+                    ? 'bg-gradient-to-r bg-gray-400 text-white'
                     : 'text-slate-400 hover:text-white hover:bg-slate-900'
                 }`}
               >
@@ -72,7 +70,7 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800">
-          <p className="text-xs text-slate-500 text-center">© 2024 GenLayer Chronicles</p>
+          <p className="text-xs text-slate-500 text-center">© 2026 GenLayer Chronicles</p>
         </div>
       </div>
 

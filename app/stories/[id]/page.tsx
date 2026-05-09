@@ -50,15 +50,15 @@ export default function StoryDetail() {
   const commentsRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
-  const [story, setStory] = useState<Story | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [liked, setLiked] = useState(false);
+  const [story, setStory]           = useState<Story | null>(null);
+  const [comments, setComments]     = useState<Comment[]>([]);
+  const [liked, setLiked]           = useState(false);
   const [commentText, setCommentText] = useState('');
   const [authorName, setAuthorName] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]       = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [imgError, setImgError]     = useState(false);
+  const [copied, setCopied]         = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -66,8 +66,8 @@ export default function StoryDetail() {
         const data = await fetchStoryById(id);
         setStory(data);
         setComments(data.comment || []);
-      } catch (error) {
-        console.error('Failed to fetch story:', error);
+      } catch (err) {
+        console.error('Failed to fetch story:', err);
       } finally {
         setLoading(false);
       }
@@ -143,32 +143,36 @@ export default function StoryDetail() {
 
       <div className="flex-1 overflow-y-auto">
 
-        {/* ── Hero Image ── full-width, relative container so children position correctly */}
-        <div className="relative w-full h-56 sm:h-72 md:h-80 lg:h-96 bg-gradient-to-br from-purple-950 to-slate-900 overflow-hidden">
-          <img
-            src={imgError ? FALLBACK : resolveImage(story.image)}
-            alt={story.title}
-            onError={() => setImgError(true)}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          {/* Fade bottom edge into page background */}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-[#0A0A0F]/10 to-transparent pointer-events-none" />
-          {/* Back button — floats over the image */}
+        {/* ── Hero ── */}
+        <div className="relative w-full bg-gradient-to-br from-purple-950 to-slate-900">
+          {/* Fixed 16:9-ish aspect ratio that collapses gracefully on mobile */}
+          <div className="w-full" style={{ paddingBottom: 'min(56.25%, 420px)' }}>
+            <img
+              src={imgError ? FALLBACK : resolveImage(story.image)}
+              alt={story.title}
+              onError={() => setImgError(true)}
+              className="absolute inset-0 w-full h-full object-cover object-center"
+            />
+            {/* Gradient overlay  darkens bottom so text is always readable */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-[#0A0A0F]/30 to-transparent pointer-events-none" />
+          </div>
+
+          {/* Back button  always visible, top-left corner */}
           <button
             onClick={() => router.back()}
-            className="absolute top-4 left-4 sm:left-6 z-10 hidden xl:block flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 text-white/80 hover:text-white hover:bg-black/70 transition-all text-sm"
+            className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-white/80 hover:text-white hover:bg-black/80 transition-all text-xs sm:text-sm"
           >
             <ArrowLeft size={13} />
-            <span>Back</span>
+            <span className="hidden sm:inline">Back</span>
           </button>
         </div>
 
-        {/* ── Body — pulled up slightly to overlap the hero fade ── */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 -mt-8 relative z-10 pb-24">
+        {/* ── Body ── pulled up to overlap hero fade */}
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 -mt-10 relative z-10 pb-24">
 
           {/* Tag + date */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-600 to-cyan-600 text-white">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r bg-gray-400 text-white">
               <Tag size={9} />
               {story.tag}
             </span>
@@ -179,12 +183,12 @@ export default function StoryDetail() {
           </div>
 
           {/* Title */}
-          <h1 className="text-2xl sm:text-3xl font-bold text-white leading-snug mb-5">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-snug mb-5">
             {story.title}
           </h1>
 
-          {/* Author + actions */}
-          <div className="flex items-center justify-between gap-4 mb-8 pb-6 border-b border-slate-800 flex-wrap">
+          {/* Author row + action buttons */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <Avatar name={story.author} size="lg" />
               <div>
@@ -192,7 +196,8 @@ export default function StoryDetail() {
                 <p className="text-xs text-slate-500">Author</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleLike}
                 title={liked ? 'Liked' : 'Like this story'}
@@ -253,7 +258,7 @@ export default function StoryDetail() {
               </span>
             </div>
 
-            {/* Form */}
+            {/* Comment form */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 mb-6">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
@@ -280,7 +285,7 @@ export default function StoryDetail() {
                 <button
                   onClick={() => handleComment()}
                   disabled={!commentText.trim() || !authorName.trim() || submitting}
-                  className="absolute bottom-2.5 right-2.5 w-8 h-8 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 flex items-center justify-center text-white disabled:opacity-35 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                  className="absolute bottom-2.5 right-2.5 w-8 h-8 rounded-lg bg-gradient-to-r bg-gray-400 flex items-center justify-center text-white disabled:opacity-35 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                 >
                   {submitting
                     ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
@@ -290,11 +295,11 @@ export default function StoryDetail() {
               </div>
             </div>
 
-            {/* List */}
+            {/* Comment list */}
             {comments.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 border border-dashed border-slate-800 rounded-2xl gap-2">
                 <MessageCircle size={24} className="text-slate-700" />
-                <p className="text-slate-500 text-sm">No comments yet — be first!</p>
+                <p className="text-slate-500 text-sm">No comments yet  be first!</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -313,7 +318,6 @@ export default function StoryDetail() {
               </div>
             )}
           </div>
-
         </div>
       </div>
     </div>
