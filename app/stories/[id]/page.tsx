@@ -1,323 +1,241 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, ArrowLeft, Send, Clock, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { fetchStoryById, likeStory, addComment, type Story, type Comment } from '@/lib/api';
+import { Heart, MessageCircle, ArrowLeft, Link2, Cpu, Sparkles } from 'lucide-react';
+import { fetchStoryById, likeStory, addComment, resolveImage, type Story, type Comment } from '@/lib/api';
+import { fetchRelatedStories } from '@/lib/api';
 import Sidebar from '@/components/Sidebar';
 
-const B = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001').replace(/\/+$/, '');
-const FALLBACK = 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1200&h=600&fit=crop&q=80';
-
-function resolveImage(image?: string): string {
-  if (!image) return FALLBACK;
-  if (image.startsWith('http')) return image;
-  return `${B}${image}`;
-}
-
-function timeAgo(date: Date | string): string {
-  const d = new Date(date);
-  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }) {
-  const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
-  const palettes = [
-    'from-purple-500 to-pink-500',
-    'from-cyan-500 to-blue-500',
-    'from-green-400 to-emerald-600',
-    'from-orange-400 to-red-500',
-    'from-violet-500 to-indigo-500',
-  ];
-  const color = palettes[(name.charCodeAt(0) || 0) % palettes.length];
-  const sz = size === 'sm' ? 'w-8 h-8 text-[11px]' : size === 'lg' ? 'w-12 h-12 text-sm' : 'w-10 h-10 text-xs';
+function RelatedCard({ story }: { story: Story }) {
   return (
-    <div className={`${sz} rounded-full bg-gradient-to-br ${color} flex items-center justify-center text-white font-bold flex-shrink-0 select-none`}>
-      {initials}
-    </div>
+    
+     <a href={`/stories/${story.id}`}
+      className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all block"
+    >
+      {story.image && (
+        <div className="h-28 rounded-lg overflow-hidden mb-3">
+          <img
+            src={story.image}
+            alt={story.title}
+            className="w-full h-full object-cover"
+            onError={e => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/20">
+          {story.tag}
+        </span>
+        {story.semanticFootprint?.emotional_cues?.[0] && (
+          <span className="text-[10px] text-slate-500">
+            {story.semanticFootprint.emotional_cues[0]}
+          </span>
+        )}
+      </div>
+      <p className="text-sm font-medium text-white line-clamp-2 mb-1">{story.title}</p>
+      <p className="text-xs text-slate-400 line-clamp-2 mb-3">
+        {story.semanticFootprint?.core_story || story.excerpt}
+      </p>
+      <div className="flex items-center justify-between text-[10px] text-slate-500">
+        <span>{story.author}</span>
+        <span className="flex items-center gap-1">
+          <Heart size={9} /> {story.likes}
+        </span>
+      </div>
+    </a>
   );
 }
 
-export default function StoryDetail() {
-  const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
-  const commentsRef = useRef<HTMLDivElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
+export default function StoryPage() {
+  const { id }   = useParams<{ id: string }>();
+  const router   = useRouter();
 
-  const [story, setStory]           = useState<Story | null>(null);
-  const [comments, setComments]     = useState<Comment[]>([]);
-  const [liked, setLiked]           = useState(false);
-  const [commentText, setCommentText] = useState('');
-  const [authorName, setAuthorName] = useState('');
-  const [loading, setLoading]       = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [imgError, setImgError]     = useState(false);
-  const [copied, setCopied]         = useState(false);
+  const [story,          setStory]          = useState<Story | null>(null);
+  const [loading,        setLoading]        = useState(true);
+  const [commentAuthor,  setCommentAuthor]  = useState('');
+  const [commentContent, setCommentContent] = useState('');
+  const [submitting,     setSubmitting]     = useState(false);
+  const [relatedChain,   setRelatedChain]   = useState<Story[]>([]);
+  const [chainLoading,   setChainLoading]   = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await fetchStoryById(id);
-        setStory(data);
-        setComments(data.comment || []);
-      } catch (err) {
-        console.error('Failed to fetch story:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    if (!id) return;
+    fetchStoryById(id)
+      .then(s => { setStory(s); setLoading(false); })
+      .catch(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+  if (!story?.id) return;
+  setChainLoading(true);
+  fetchRelatedStories(story.id)
+    .then(setRelatedChain)
+    .catch(() => {})
+    .finally(() => setChainLoading(false));
+}, [story?.id]);
+
   const handleLike = async () => {
-    if (!liked && story) {
-      try {
-        await likeStory(story.id);
-        setLiked(true);
-        setStory(s => s ? { ...s, likes: s.likes + 1 } : s);
-      } catch (e) { console.error(e); }
-    }
+    if (!story) return;
+    const updated = await likeStory(story.id).catch(() => null);
+    if (updated) setStory(updated);
   };
 
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* silent */ }
-  };
-
-  const scrollToComments = () => {
-    commentsRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setTimeout(() => nameRef.current?.focus(), 400);
-  };
-
-  const handleComment = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!commentText.trim() || !authorName.trim() || submitting) return;
+  const handleComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!story || !commentAuthor.trim() || !commentContent.trim()) return;
     setSubmitting(true);
-    try {
-      const newComment = await addComment(id, authorName, commentText);
-      setComments(prev => [...prev, newComment]);
-      setCommentText('');
-      setTimeout(() => commentsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100);
-    } catch (e) { console.error(e); }
-    finally { setSubmitting(false); }
+    const comment = await addComment(story.id, commentAuthor, commentContent).catch(() => null);
+    if (comment) {
+      setStory(prev => prev
+        ? { ...prev, comment: [comment, ...(prev.comment ?? [])], comments: prev.comments + 1 }
+        : prev);
+      setCommentContent('');
+    }
+    setSubmitting(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex h-screen bg-[#0A0A0F]">
-        <Sidebar />
-        <div className="flex-1 flex flex-col items-center justify-center gap-4">
-          <div className="w-10 h-10 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-          <p className="text-slate-500 text-sm">Loading story…</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex h-screen bg-[#0A0A0F] items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500" />
+    </div>
+  );
 
-  if (!story) {
-    return (
-      <div className="flex h-screen bg-[#0A0A0F]">
-        <Sidebar />
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
-          <p className="text-white text-xl font-bold">Story not found</p>
-          <button onClick={() => router.push('/')} className="text-purple-400 text-sm hover:text-purple-300 transition-colors">
-            ← Back to gallery
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!story) return (
+    <div className="flex h-screen bg-[#0A0A0F] items-center justify-center text-slate-400">
+      Story not found.
+    </div>
+  );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0A0A0F]">
+    <div className="flex h-screen xl:overflow-hidden bg-[#0A0A0F]">
       <Sidebar />
-
       <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-6 py-10 mt-10">
 
-        {/* ── Hero ── */}
-        <div className="relative w-full bg-gradient-to-br from-purple-950 to-slate-900">
-          {/* Fixed 16:9-ish aspect ratio that collapses gracefully on mobile */}
-          <div className="w-full" style={{ paddingBottom: 'min(56.25%, 420px)' }}>
-            <img
-              src={imgError ? FALLBACK : resolveImage(story.image)}
-              alt={story.title}
-              onError={() => setImgError(true)}
-              className="absolute inset-0 w-full h-full object-cover object-center"
-            />
-            {/* Gradient overlay  darkens bottom so text is always readable */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F] via-[#0A0A0F]/30 to-transparent pointer-events-none" />
-          </div>
-
-          {/* Back button  always visible, top-left corner */}
-          <button
-            onClick={() => router.back()}
-            className="absolute top-3 left-3 sm:top-4 sm:left-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 text-white/80 hover:text-white hover:bg-black/80 transition-all text-xs sm:text-sm"
-          >
-            <ArrowLeft size={13} />
-            <span className="hidden sm:inline">Back</span>
+          <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-8 transition-colors">
+            <ArrowLeft size={16} /> Back
           </button>
-        </div>
 
-        {/* ── Body ── pulled up to overlap hero fade */}
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 -mt-10 relative z-10 pb-24">
+          <div className="h-72 rounded-2xl overflow-hidden bg-gradient-to-br from-purple-900 to-cyan-900 mb-8">
+            <img
+              src={resolveImage(story.image)} alt={story.title}
+              className="w-full h-full object-cover"
+              onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&h=400&fit=crop'; }}
+            />
+          </div>
 
-          {/* Tag + date */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r bg-gray-400 text-white">
-              <Tag size={9} />
-              {story.tag}
-            </span>
-            <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-              <Clock size={10} />
-              {timeAgo(story.createdAt)}
-            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-400 text-white">{story.tag}</span>
+            {story.onChainConfirmed && (
+              <span className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-400 border border-purple-500/25">
+                <Link2 size={11} /> Validated On-Chain
+              </span>
+            )}
+            {story.tags?.map(t => (
+              <span key={t} className="px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-400">#{t}</span>
+            ))}
           </div>
 
-          {/* Title */}
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-snug mb-5">
-            {story.title}
-          </h1>
+          <h1 className="text-3xl font-bold text-white mb-3">{story.title}</h1>
+          <div className="flex items-center gap-4 text-sm text-slate-400 mb-8">
+            <span className="font-medium text-white">{story.author}</span>
+            <span>{new Date(story.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <button onClick={handleLike} className="flex items-center gap-1.5 hover:text-red-400 transition-colors">
+              <Heart size={14} /> {story.likes}
+            </button>
+            <span className="flex items-center gap-1.5"><MessageCircle size={14} /> {story.comments}</span>
+          </div>
 
-          {/* Author row + action buttons */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-slate-800">
-            <div className="flex items-center gap-3">
-              <Avatar name={story.author} size="lg" />
-              <div>
-                <p className="text-sm font-semibold text-white">{story.author}</p>
-                <p className="text-xs text-slate-500">Author</p>
+          <div className="mb-12">
+            {story.content.split('\n').map((p, i) => (
+              <p key={i} className="text-slate-300 leading-relaxed mb-4">{p}</p>
+            ))}
+          </div>
+
+          {/* Groq Footprint Panel */}
+          {story.semanticFootprint?.core_story && (
+            <div className="mb-12 bg-slate-900/60 border border-purple-500/20 rounded-2xl p-6">
+              <h2 className="text-sm font-semibold text-purple-400 mb-4 flex items-center gap-2">
+                <Cpu size={14} /> Groq Semantic Footprint
+              </h2>
+              <p className="text-slate-300 text-sm italic mb-4">"{story.semanticFootprint.core_story}"</p>
+              {story.semanticFootprint.context && (
+                <p className="text-xs text-slate-500 mb-4">{story.semanticFootprint.context}</p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {story.semanticFootprint.emotional_cues?.map(cue => (
+                  <span key={cue} className="px-2 py-0.5 rounded-full text-[11px] bg-purple-500/10 text-purple-300 border border-purple-500/20">{cue}</span>
+                ))}
+                {story.semanticFootprint.key_entities?.map(ent => (
+                  <span key={ent} className="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400">{ent}</span>
+                ))}
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={handleLike}
-                title={liked ? 'Liked' : 'Like this story'}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-all ${
-                  liked
-                    ? 'bg-red-500/15 text-red-400 border-red-500/30'
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-red-400 hover:border-red-500/30'
-                }`}
-              >
-                <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
-                {story.likes}
-              </button>
-              <button
-                onClick={scrollToComments}
-                title="Go to comments"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700 transition-all"
-              >
-                <MessageCircle size={14} />
-                {comments.length}
-              </button>
-              <button
-                onClick={handleShare}
-                title="Copy link"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all ${
-                  copied
-                    ? 'bg-green-500/15 text-green-400 border-green-500/30'
-                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
-                }`}
-              >
-                <Share2 size={14} />
-                <span className="hidden sm:inline">{copied ? 'Copied!' : 'Share'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Story body */}
-          <p className="text-slate-300 leading-relaxed text-base whitespace-pre-wrap mb-10">
-            {story.content}
-          </p>
-
-          {/* Tags */}
-          {story.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-2 pb-8 mb-8 border-b border-slate-800">
-              {story.tags.map((t, i) => (
-                <span key={i} className="px-2.5 py-1 rounded-full text-xs bg-slate-800 text-slate-400 border border-slate-700">
-                  #{t}
-                </span>
-              ))}
+              {story.genLayerTxHash && (
+                <div className="mt-4 pt-4 border-t border-slate-800">
+                  <p className="text-[10px] text-slate-600 mb-0.5">GenLayer tx hash</p>
+                  <p className="text-xs text-slate-500 font-mono break-all">{story.genLayerTxHash}</p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── Comments ── */}
-          <div ref={commentsRef}>
-            <div className="flex items-center gap-2 mb-5">
-              <h2 className="text-base font-bold text-white">Comments</h2>
-              <span className="px-2 py-0.5 text-xs rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                {comments.length}
-              </span>
-            </div>
-
-            {/* Comment form */}
-            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 mb-6">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
-                  {authorName ? authorName[0].toUpperCase() : '?'}
-                </div>
-                <input
-                  ref={nameRef}
-                  type="text"
-                  placeholder="Your name"
-                  value={authorName}
-                  onChange={(e) => setAuthorName(e.target.value)}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors"
-                />
+          {/* Related On-Chain Memories */}
+          <div className="mb-12">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Sparkles size={16} className="text-cyan-400" /> Related Memories — Matched On-Chain
+            </h2>
+            {chainLoading ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-purple-500" />
+                Querying GenLayer contract…
               </div>
-              <div className="relative">
-                <textarea
-                  placeholder="Write a comment… (⌘+Enter to post)"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleComment(); }}
-                  rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 pr-12 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors resize-none"
-                />
-                <button
-                  onClick={() => handleComment()}
-                  disabled={!commentText.trim() || !authorName.trim() || submitting}
-                  className="absolute bottom-2.5 right-2.5 w-8 h-8 rounded-lg bg-gradient-to-r bg-gray-400 flex items-center justify-center text-white disabled:opacity-35 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-                >
-                  {submitting
-                    ? <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-                    : <Send size={12} />
-                  }
-                </button>
-              </div>
-            </div>
-
-            {/* Comment list */}
-            {comments.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 border border-dashed border-slate-800 rounded-2xl gap-2">
-                <MessageCircle size={24} className="text-slate-700" />
-                <p className="text-slate-500 text-sm">No comments yet  be first!</p>
+            ) : relatedChain.length > 0 ? (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {relatedChain.map((s) => <RelatedCard key={s.id} story={s} />)}
               </div>
             ) : (
-              <div className="space-y-3">
-                {comments.map((c, i) => (
-                  <div key={c.id || i} className="flex gap-3 p-3.5 rounded-xl bg-slate-900/40 border border-slate-800/50 hover:border-slate-700/70 transition-colors">
-                    <Avatar name={c.author || 'A'} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 mb-1 flex-wrap">
-                        <span className="text-sm font-semibold text-white">{c.author}</span>
-                        <span className="text-xs text-slate-600">{timeAgo(c.createdAt)}</span>
-                      </div>
-                      <p className="text-sm text-slate-300 leading-relaxed break-words">{c.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="text-slate-500 text-sm">No related on-chain memories found yet.</p>
             )}
           </div>
+
+          {/* Comments */}
+          <div>
+            <h2 className="text-lg font-bold text-white mb-6">Comments ({story.comments})</h2>
+            <form onSubmit={handleComment} className="mb-8 space-y-3">
+              <input
+                type="text" value={commentAuthor} onChange={e => setCommentAuthor(e.target.value)}
+                placeholder="Your name"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-slate-700 text-sm"
+              />
+              <textarea
+                value={commentContent} onChange={e => setCommentContent(e.target.value)}
+                placeholder="Leave a comment…" rows={3}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none text-sm"
+              />
+              <button
+                type="submit" disabled={submitting}
+                className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {submitting ? 'Posting…' : 'Post Comment'}
+              </button>
+            </form>
+
+            <div className="space-y-4">
+              {story.comment?.map(c => (
+                <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-white">{c.author}</span>
+                    <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-sm text-slate-300">{c.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

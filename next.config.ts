@@ -1,22 +1,9 @@
 import type { NextConfig } from 'next';
 
-const BACKEND = process.env.BACKEND_URL || 'http://localhost:3001';
-
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      // Proxy all /api/stories* and /api/stats to Express
-      // Must be listed BEFORE any Next.js /api/* routes you own
-      {
-        source: '/api/stories/:path*',
-        destination: `${BACKEND}/api/stories/:path*`,
-      },
-      {
-        source: '/api/stats',
-        destination: `${BACKEND}/api/stats`,
-      },
-    ];
-  },
+  // Disable Turbopack — use stable Webpack bundler instead.
+  // Next.js 16 Turbopack panics on certain dependency graphs.
+  turbopack: undefined,
 
   images: {
     remotePatterns: [
