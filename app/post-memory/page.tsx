@@ -186,7 +186,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           {footprint && (
             <div className="mb-8 bg-slate-900 border border-purple-500/20 rounded-xl p-5 space-y-3">
               <p className="text-xs font-semibold text-purple-400 flex items-center gap-1.5">
-                <Cpu size={12} /> Groq Semantic Footprint
+                <Cpu size={12} /> GenLayer Footprint
               </p>
 
               {/* Vision description if image was analyzed */}

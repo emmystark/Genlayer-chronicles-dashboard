@@ -9,40 +9,35 @@ import Sidebar from '@/components/Sidebar';
 
 function RelatedCard({ story }: { story: Story }) {
   return (
-    
-     <a href={`/stories/${story.id}`}
-      className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all block"
-    >
+    <a href={`/stories/${story.id}`} className="...">
       {story.image && (
         <div className="h-28 rounded-lg overflow-hidden mb-3">
           <img
             src={story.image}
             alt={story.title}
             className="w-full h-full object-cover"
-            onError={e => {
+            onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
             }}
           />
         </div>
       )}
+
       <div className="flex items-center gap-2 mb-2">
         <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/20">
-          {story.tag}
+          {story.tag || story.semanticFootprint?.emotional_cues?.[0] || 'memory'}
         </span>
-        {story.semanticFootprint?.emotional_cues?.[0] && (
-          <span className="text-[10px] text-slate-500">
-            {story.semanticFootprint.emotional_cues[0]}
-          </span>
-        )}
       </div>
+
       <p className="text-sm font-medium text-white line-clamp-2 mb-1">{story.title}</p>
       <p className="text-xs text-slate-400 line-clamp-2 mb-3">
         {story.semanticFootprint?.core_story || story.excerpt}
       </p>
+
       <div className="flex items-center justify-between text-[10px] text-slate-500">
         <span>{story.author}</span>
         <span className="flex items-center gap-1">
-          <Heart size={9} /> {story.likes}
+          <Heart size={9} /> {story.likes || 0}
         </span>
       </div>
     </a>
@@ -57,6 +52,9 @@ export default function StoryPage() {
   const [loading,        setLoading]        = useState(true);
   const [commentAuthor,  setCommentAuthor]  = useState('');
   const [commentContent, setCommentContent] = useState('');
+  const [replyToId,      setReplyToId]      = useState<string | null>(null);
+  const [replyAuthor,    setReplyAuthor]    = useState('');
+  const [replyContent,   setReplyContent]   = useState('');
   const [submitting,     setSubmitting]     = useState(false);
   const [relatedChain,   setRelatedChain]   = useState<Story[]>([]);
   const [chainLoading,   setChainLoading]   = useState(false);
@@ -83,6 +81,24 @@ export default function StoryPage() {
     if (updated) setStory(updated);
   };
 
+  const insertCommentIntoTree = (comments: Comment[] | undefined, comment: Comment): Comment[] => {
+    if (!comments || !comments.length) return [comment];
+    if (!comment.parentCommentId) return [comment, ...comments];
+
+    return comments.map((thread) => {
+      if (thread.id === comment.parentCommentId) {
+        return {
+          ...thread,
+          replies: [comment, ...(thread.replies ?? [])],
+        };
+      }
+      return {
+        ...thread,
+        replies: thread.replies ? insertCommentIntoTree(thread.replies, comment) : thread.replies,
+      };
+    });
+  };
+
   const handleComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!story || !commentAuthor.trim() || !commentContent.trim()) return;
@@ -90,12 +106,93 @@ export default function StoryPage() {
     const comment = await addComment(story.id, commentAuthor, commentContent).catch(() => null);
     if (comment) {
       setStory(prev => prev
-        ? { ...prev, comment: [comment, ...(prev.comment ?? [])], comments: prev.comments + 1 }
+        ? { ...prev, comment: insertCommentIntoTree(prev.comment, comment), comments: prev.comments + 1 }
         : prev);
       setCommentContent('');
     }
     setSubmitting(false);
   };
+
+  const handleReply = async (e: React.FormEvent, parentCommentId: string) => {
+    e.preventDefault();
+    if (!story || !replyAuthor.trim() || !replyContent.trim()) return;
+    setSubmitting(true);
+    const comment = await addComment(story.id, replyAuthor, replyContent, parentCommentId).catch(() => null);
+    if (comment) {
+      setStory(prev => prev
+        ? { ...prev, comment: insertCommentIntoTree(prev.comment, comment), comments: prev.comments + 1 }
+        : prev);
+      setReplyContent('');
+      setReplyAuthor('');
+      setReplyToId(null);
+    }
+    setSubmitting(false);
+  };
+
+  const renderComment = (comment: Comment, depth = 0) => (
+    <div
+      key={comment.id}
+      className={`bg-slate-900 border border-slate-800 rounded-xl p-4 ${depth ? 'ml-6 sm:ml-10' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-white">{comment.author}</p>
+          <p className="text-xs text-slate-500">{new Date(comment.createdAt).toLocaleDateString()}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setReplyToId(comment.id);
+            setReplyAuthor('');
+            setReplyContent('');
+          }}
+          className="text-xs text-cyan-300 hover:text-white"
+        >
+          Reply
+        </button>
+      </div>
+      <p className="text-sm text-slate-300 mt-3">{comment.content}</p>
+      {replyToId === comment.id && (
+        <form onSubmit={(e) => handleReply(e, comment.id)} className="mt-4 space-y-3">
+          <input
+            type="text"
+            value={replyAuthor}
+            onChange={e => setReplyAuthor(e.target.value)}
+            placeholder="Your name"
+            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-slate-700 text-sm"
+          />
+          <textarea
+            value={replyContent}
+            onChange={e => setReplyContent(e.target.value)}
+            placeholder="Write a reply…"
+            rows={2}
+            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none text-sm"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            >
+              {submitting ? 'Replying…' : 'Post reply'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReplyToId(null)}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {comment.replies?.length ? (
+        <div className="mt-4 space-y-3">
+          {comment.replies.map((reply) => renderComment(reply, depth + 1))}
+        </div>
+      ) : null}
+    </div>
+  );
 
   if (loading) return (
     <div className="flex h-screen bg-[#0A0A0F] items-center justify-center">
@@ -159,7 +256,7 @@ export default function StoryPage() {
           {story.semanticFootprint?.core_story && (
             <div className="mb-12 bg-slate-900/60 border border-purple-500/20 rounded-2xl p-6">
               <h2 className="text-sm font-semibold text-purple-400 mb-4 flex items-center gap-2">
-                <Cpu size={14} /> Groq Semantic Footprint
+                <Cpu size={14} /> GenLayer Footprint
               </h2>
               <p className="text-slate-300 text-sm italic mb-4">"{story.semanticFootprint.core_story}"</p>
               {story.semanticFootprint.context && (
@@ -185,7 +282,7 @@ export default function StoryPage() {
           {/* Related On-Chain Memories */}
           <div className="mb-12">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Sparkles size={16} className="text-cyan-400" /> Related Memories — Matched On-Chain
+              <Sparkles size={16} className="text-cyan-400" /> Related Memories - GenLayer + AI context
             </h2>
             {chainLoading ? (
               <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -224,15 +321,13 @@ export default function StoryPage() {
             </form>
 
             <div className="space-y-4">
-              {story.comment?.map(c => (
-                <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-white">{c.author}</span>
-                    <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleDateString()}</span>
-                  </div>
-                  <p className="text-sm text-slate-300">{c.content}</p>
+              {story.comment?.length ? (
+                story.comment.map(comment => renderComment(comment))
+              ) : (
+                <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-500">
+                  Be the first to connect through this memory. Share what moved you, ask a question, or reply to someone else’s story.
                 </div>
-              ))}
+              )}
             </div>
           </div>
 

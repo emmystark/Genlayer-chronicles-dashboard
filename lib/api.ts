@@ -30,9 +30,11 @@ export interface Story {
 export interface Comment {
   id: string;
   storyId: string;
+  parentCommentId?: string | null;
   author: string;
   content: string;
   createdAt: Date;
+  replies?: Comment[];
 }
 
 export interface Stats {
@@ -119,12 +121,15 @@ export async function createStory(data: {
 
 
 
-export async function fetchRelatedStories(storyId: string): Promise<Story[]> {
-  const res = await fetch(`${B}/api/stories/${storyId}/related`);
-  if (!res.ok) return [];
-  return res.json();
+// lib/api.ts
+export async function fetchRelatedStories(mongoId: string, limit = 6): Promise<Story[]> {
+  const res = await safeFetch(`${B}/api/stories/${mongoId}/related?limit=${limit}`, { cache: 'no-store' });
+  if (!res.ok) {
+    console.error('Failed to fetch related stories', await res.text());
+    return [];
+  }
+  return (await res.json()).map(norm);
 }
-
 
 
 export async function markStoryOnChain(id: string, genLayerTxHash: string): Promise<Story> {
@@ -143,11 +148,11 @@ export async function likeStory(id: string): Promise<Story> {
   return norm(await res.json());
 }
 
-export async function addComment(storyId: string, author: string, content: string): Promise<Comment> {
+export async function addComment(storyId: string, author: string, content: string, parentCommentId?: string | null): Promise<Comment> {
   const res = await safeFetch(`${B}/api/stories/${storyId}/comments`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ author, content }),
+    body:    JSON.stringify({ author, content, parentCommentId }),
   });
   if (!res.ok) throw new Error('Failed to add comment');
   return norm(await res.json());
